@@ -1,0 +1,223 @@
+import numpy as np
+import random
+import time
+import tracemalloc
+import matplotlib.pyplot as plt
+import statistics
+import sys
+
+# Increase recursion limit for large arrays if necessary
+sys.setrecursionlimit(1000000)
+
+# Constants
+ARRAY_SIZES = [10**3, 10**4, 10**5, 10**6]
+NUM_TESTS = 30
+SEED = 42  # For reproducibility
+
+random.seed(SEED)
+np.random.seed(SEED)
+
+# Function to generate sorted arrays
+def generate_sorted_array(size):
+    array = np.random.rand(size)
+    array.sort()
+    return array.tolist()
+
+# Search Algorithms with comparison counting
+def simple_sequential_search(arr, x):
+    comparisons = 0
+    for index, element in enumerate(arr):
+        comparisons += 1
+        if element == x:
+            return index, comparisons
+    return -1, comparisons
+
+def optimized_sequential_search(arr, x):
+    comparisons = 0
+    for index, element in enumerate(arr):
+        comparisons += 1
+        if element == x:
+            return index, comparisons
+        elif element > x:
+            return -1, comparisons
+    return -1, comparisons
+
+def iterative_binary_search(arr, x):
+    comparisons = 0
+    left, right = 0, len(arr) - 1
+    while left <= right:
+        mid = left + (right - left) // 2
+        comparisons += 1
+        if arr[mid] == x:
+            return mid, comparisons
+        elif arr[mid] < x:
+            left = mid + 1
+        else:
+            right = mid - 1
+    return -1, comparisons
+
+def recursive_binary_search_helper(arr, x, left, right, comparisons):
+    if left > right:
+        return -1, comparisons
+    mid = left + (right - left) // 2
+    comparisons += 1
+    if arr[mid] == x:
+        return mid, comparisons
+    elif arr[mid] < x:
+        return recursive_binary_search_helper(arr, x, mid + 1, right, comparisons)
+    else:
+        return recursive_binary_search_helper(arr, x, left, mid - 1, comparisons)
+
+def recursive_binary_search(arr, x):
+    comparisons = 0
+    return recursive_binary_search_helper(arr, x, 0, len(arr) - 1, comparisons)
+
+# Function to perform the tests
+def perform_test(arr, search_value):
+    results = {}
+    
+    # Simple Sequential Search
+    start_time = time.time()
+    tracemalloc.start()
+    index, comparisons = simple_sequential_search(arr, search_value)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    execution_time = time.time() - start_time
+    results['Simple Sequential Search'] = {
+        'comparisons': comparisons,
+        'execution_time': execution_time,
+        'memory_usage': peak
+    }
+    
+    # Optimized Sequential Search
+    start_time = time.time()
+    tracemalloc.start()
+    index, comparisons = optimized_sequential_search(arr, search_value)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    execution_time = time.time() - start_time
+    results['Optimized Sequential Search'] = {
+        'comparisons': comparisons,
+        'execution_time': execution_time,
+        'memory_usage': peak
+    }
+    
+    # Iterative Binary Search
+    start_time = time.time()
+    tracemalloc.start()
+    index, comparisons = iterative_binary_search(arr, search_value)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    execution_time = time.time() - start_time
+    results['Iterative Binary Search'] = {
+        'comparisons': comparisons,
+        'execution_time': execution_time,
+        'memory_usage': peak
+    }
+    
+    # Recursive Binary Search
+    start_time = time.time()
+    tracemalloc.start()
+    index, comparisons = recursive_binary_search(arr, search_value)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    execution_time = time.time() - start_time
+    results['Recursive Binary Search'] = {
+        'comparisons': comparisons,
+        'execution_time': execution_time,
+        'memory_usage': peak
+    }
+    
+    return results
+
+# Function to decide whether to include the search value in the array
+def generate_search_value(arr):
+    include = random.choice([True, False])
+    if include:
+        return random.choice(arr)
+    else:
+        while True:
+            x = random.random()
+            if x not in arr:
+                return x
+
+# Function to run all tests and collect data
+def run_tests():
+    data = {size: {algo: {'comparisons': [], 'execution_time': [], 'memory_usage': []} 
+                    for algo in ['Simple Sequential Search', 'Optimized Sequential Search', 
+                                 'Iterative Binary Search', 'Recursive Binary Search']} 
+            for size in ARRAY_SIZES}
+    
+    for size in ARRAY_SIZES:
+        arr = generate_sorted_array(size)
+        
+        for _ in range(NUM_TESTS):
+            search_value = generate_search_value(arr)
+            results = perform_test(arr, search_value)
+            
+            for algo, metrics in results.items():
+                data[size][algo]['comparisons'].append(metrics['comparisons'])
+                data[size][algo]['execution_time'].append(metrics['execution_time'])
+                data[size][algo]['memory_usage'].append(metrics['memory_usage'])
+
+    return data
+
+# Function to calculate average and variance
+def calculate_stats(data):
+    stats = {}
+    for size, algos in data.items():
+        stats[size] = {}
+        for algo, metrics in algos.items():
+            stats[size][algo] = {
+                'comparisons_avg': statistics.mean(metrics['comparisons']),
+                'comparisons_var': statistics.variance(metrics['comparisons']),
+                'execution_time_avg': statistics.mean(metrics['execution_time']),
+                'execution_time_var': statistics.variance(metrics['execution_time']),
+                'memory_usage_avg': statistics.mean(metrics['memory_usage']),
+                'memory_usage_var': statistics.variance(metrics['memory_usage'])
+            }
+    return stats
+
+# Function to plot graphs
+def plot_graphs(stats):
+    metrics = ['comparisons', 'execution_time', 'memory_usage']
+    metric_labels = {
+        'comparisons': 'Number of Comparisons',
+        'execution_time': 'Execution Time (seconds)',
+        'memory_usage': 'Memory Usage (Bytes)'
+    }
+
+    for metric in metrics:
+        plt.figure(figsize=(10, 6))
+        for algo in ['Simple Sequential Search', 'Optimized Sequential Search', 
+                     'Iterative Binary Search', 'Recursive Binary Search']:
+            averages = [stats[size][algo][f"{metric}_avg"] for size in ARRAY_SIZES]
+            plt.plot(ARRAY_SIZES, averages, marker='o', label=algo)
+        plt.xlabel('Array Size')
+        plt.ylabel(metric_labels[metric])
+        plt.title(f'Comparison of Search Algorithms by {metric_labels[metric]}')
+        plt.xscale('log')
+        if metric in ['execution_time', 'memory_usage']:
+            plt.yscale('log')
+        plt.legend()
+        plt.grid(True, which="both", ls="--", linewidth=0.5)
+        plt.tight_layout()
+        plt.savefig(f"{metric}_comparison.png")
+        plt.show()
+
+# Function to print the statistics
+def print_stats(stats):
+    for size in ARRAY_SIZES:
+        print(f"\nArray Size: {size}")
+        for algo, metrics in stats[size].items():
+            print(f"  {algo}:")
+            print(f"    Comparisons - Avg: {metrics['comparisons_avg']:.2f}, Variance: {metrics['comparisons_var']:.2f}")
+            print(f"    Execution Time - Avg: {metrics['execution_time_avg']:.6f} s, Variance: {metrics['execution_time_var']:.6f} s")
+            print(f"    Memory Usage - Avg: {metrics['memory_usage_avg']} Bytes, Variance: {metrics['memory_usage_var']} Bytes")
+
+# Main Execution
+if __name__ == "__main__":
+    data = run_tests()
+    stats = calculate_stats(data)
+    print_stats(stats)
+    plot_graphs(stats)
